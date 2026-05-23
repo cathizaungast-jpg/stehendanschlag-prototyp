@@ -39,15 +39,16 @@
     }
     .frame.active { display: block; }
     .frame img {
-      /* Match Figma: standing-rotation-01 component is 402×874px,
-         centered at left:-6px top:25px in the 390×844 phone frame.
-         The phone's overflow:hidden clips the ~6px horizontal and
-         ~55px bottom overflow, matching Figma's clipping behaviour. */
+      /* SVG viewBox is 1179×2556 but figure content only fills top 67%
+         (Y 0–1715). Scale up so figure fills ~750px of the 844px phone.
+         Required img height: 750 × (2556/1715) ≈ 1117px.
+         Width scaled to maintain aspect ratio: 1117 × (1179/2556) ≈ 515px.
+         Centered horizontally: left = (390−515)/2 = −63px. */
       position: absolute;
-      width: 402px;
-      height: 874px;
-      left: -6px;
-      top: 25px;
+      width: 515px;
+      height: 1117px;
+      left: -63px;
+      top: 0px;
       display: block;
     }
 
