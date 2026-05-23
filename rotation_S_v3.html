@@ -37,16 +37,12 @@
     }
     .frame.active { display: block; }
     .frame img {
-      /* SVG viewBox is 1179×2556 but figure content only fills top 67%
-         (Y 0–1715). Scale up so figure fills ~750px of the 844px phone.
-         Required img height: 750 × (2556/1715) ≈ 1117px.
-         Width scaled to maintain aspect ratio: 1117 × (1179/2556) ≈ 515px.
-         Centered horizontally: left = (390−515)/2 = −63px. */
+      /* New Figma SVGs: viewBox 390×819, positioned at y=25 within the 844px phone frame */
       position: absolute;
-      width: 515px;
-      height: 1117px;
-      left: -63px;
-      top: 0px;
+      width: 390px;
+      height: 819px;
+      left: 0;
+      top: 25px;
       display: block;
     }
 
@@ -784,7 +780,8 @@
 
   /* ── Fit phone to viewport on desktop ───────────────────────── */
   function fitPhone() {
-    const s = Math.min(window.innerWidth / PHONE_W, window.innerHeight / PHONE_H, 1);
+    // Scale based on width so the phone always fills the full screen width
+    const s = window.innerWidth / PHONE_W;
     phone.style.transform = `translate(-50%,-50%) scale(${s})`;
   }
   fitPhone();
