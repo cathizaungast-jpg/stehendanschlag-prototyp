@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stehendanschlag – Experiment (S)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #888;
+      margin: 0;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      height: 100svh;
+    }
+
+    .phone {
+      width: 402px;
+      height: 874px;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      transform-origin: center center;
+      overflow: hidden;
+      border-radius: 44px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      background: #f6f6f6;
+    }
+
+    /* ── Rotation frames ── */
+    .frame { position: absolute; inset: 0; display: none; }
+    .frame.active { display: block; }
+    .frame img { width: 100%; height: 100%; display: block; object-fit: fill; }
+
+    /* ── Spotlights ── */
+    .spots-layer { position: absolute; inset: 0; pointer-events: none; z-index: 15; }
+    .spots-layer.visible { pointer-events: auto; }
+    .spot {
+      position: absolute; width: 44px; height: 44px;
+      transform: translate(-50%, -50%);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; opacity: 0; transition: opacity 0.6s ease;
+    }
+    .spots-layer.visible .spot { opacity: 1; }
+    .spot-inner {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: #3d7fc1; border: 2.5px solid rgba(255,255,255,0.9);
+      box-shadow: 0 0 0 3px rgba(61,127,193,0.35);
+    }
+    .spots-layer.visible .spot-inner { animation: pulse 2.2s ease-in-out infinite; }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 3px rgba(61,127,193,0.35); }
+      50%       { box-shadow: 0 0 0 9px rgba(61,127,193,0.12); }
+    }
+    .spot:active .spot-inner { background: #2a5f99; }
+
+    /* ── Closeup overlays ── */
+    .closeup-layer {
+      position: absolute; inset: 0; z-index: 30;
+      transform: translateX(100%);
+      transition: transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      display: block; pointer-events: none;
+    }
+    .closeup-layer.visible { transform: translateX(0); pointer-events: auto; }
+    .closeup-layer.swiping { transition: none; }
+    .closeup-layer img { width: 100%; height: 100%; display: block; object-fit: fill; }
+
+    /* ── Text slide layers ── */
+    .text-layer {
+      position: absolute; inset: 0; z-index: 35;
+      transform: translateY(100%); opacity: 0;
+      pointer-events: none; cursor: pointer;
+    }
+    .text-layer img { width: 100%; height: 100%; display: block; object-fit: fill; }
+    .text-layer.peeking {
+      opacity: 1; transform: translateY(calc(100% - 28px));
+      animation: text-peek 1.4s ease-in-out infinite;
+      pointer-events: auto; cursor: pointer;
+    }
+    .text-layer.peeking::before {
+      content: ''; position: absolute; top: 10px; left: 50%;
+      transform: translateX(-50%); width: 44px; height: 5px;
+      background: #3d7fc1; border-radius: 3px; opacity: 0.85; z-index: 2;
+    }
+    @keyframes text-peek {
+      0%, 100% { transform: translateY(calc(100% - 28px)); }
+      50%       { transform: translateY(calc(100% - 68px)); }
+    }
+    .text-layer.visible {
+      opacity: 1; transform: translateY(0); pointer-events: auto;
+      animation: none; transition: opacity 0.6s ease;
+    }
+
+    /* ── "Mehr" tap zone ── */
+    .mehr-btn {
+      position: absolute; bottom: 18px; left: 50%;
+      transform: translateX(-50%); width: 80px; height: 36px;
+      z-index: 3; cursor: pointer;
+    }
+
+    /* ── Detail screens ── */
+    .detail-layer {
+      position: absolute; inset: 0; z-index: 40;
+      transform: translateX(100%);
+      transition: transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      pointer-events: none; background: #f6f6f6;
+    }
+    .detail-layer.visible { transform: translateX(0); pointer-events: auto; }
+    .detail-scroll {
+      width: 100%; height: 100%;
+      overflow-y: auto; -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain; position: relative;
+    }
+    .detail-scroll > img { width: 100%; height: auto; display: block; }
+
+    /* ── Interactive experiment overlays (detail 1 only) ── */
+    .detail-interactive-wrap { position: relative; width: 100%; }
+    .detail-interactive-wrap > img { width: 100%; height: auto; display: block; }
+
+    /*
+     * ════ EXPERIMENT POSITION GUIDE ════════════════════════════════════════
+     *
+     *  Image: detail_S_1_interaktiv.png — 402 × 3177 px (displayed)
+     *
+     *  Adjust these CSS variables until each handle sits over the correct
+     *  footprint / target graphic. All values are in pixels from image top.
+     *  "left" is the horizontal centre of the element.
+     *
+     *  Zone 1  Problemstellung   ─ footprint pair shifts  ←  →
+     *  Zone 2  Feinjustierung    ─ footprint pair rotates  ↺  CCW
+     *  Zone 3  Was passiert      ─ right foot shifts; target dot follows
+     * ════════════════════════════════════════════════════════════════════════
+     */
+    :root {
+      /* ── Zone 1 ────────────────────────────────── */
+      --z1-top:   760px;   /* vertical centre of Zone-1 footprint graphic */
+      --z1-left:  201px;   /* horizontal centre (image = 402 px wide) */
+      --z1-range:  55px;   /* max L / R shift */
+
+      /* ── Zone 2 ────────────────────────────────── */
+      --z2-top:  1050px;
+      --z2-left:  201px;
+      --z2-range:  28deg;  /* max rotation angle */
+
+      /* ── Zone 3 ────────────────────────────────── */
+      --z3-foot-top:    1690px;
+      --z3-foot-left:    272px;  /* right side of footprint pair */
+      --z3-target-top:  1840px;
+      --z3-target-left:  201px;
+      --z3-range:         55px;
+    }
+
+    /* ── Shared handle base ─────────────────────────────── */
+    .ix-handle {
+      position: absolute;
+      border: 2px solid rgba(61,127,193,0.72);
+      background: rgba(61,127,193,0.13);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      touch-action: none; user-select: none; z-index: 10;
+      transition: transform 0.45s cubic-bezier(0.34,1.56,0.64,1), background 0.15s ease;
+    }
+    .ix-handle.ix-dragging { transition: background 0.15s ease; }
+    .ix-handle:active       { background: rgba(61,127,193,0.25); }
+
+    /* Zone 1 — wide pill, L/R drag */
+    .ix-z1 {
+      width: 154px; height: 80px;
+      top: var(--z1-top); left: var(--z1-left);
+      transform: translate(-50%,-50%);
+      cursor: ew-resize;
+    }
+
+    /* Zone 2 — square, CCW rotation */
+    .ix-z2 {
+      width: 118px; height: 96px;
+      top: var(--z2-top); left: var(--z2-left);
+      transform: translate(-50%,-50%) rotate(0deg);
+      cursor: grab;
+    }
+    .ix-z2:active { cursor: grabbing; }
+    .ix-z2-label  { font-size: 30px; color: #3d7fc1; line-height: 1; user-select: none; }
+
+    /* Zone 3 — narrow pill, right foot */
+    .ix-z3 {
+      width: 64px; height: 88px;
+      top: var(--z3-foot-top); left: var(--z3-foot-left);
+      transform: translate(-50%,-50%);
+      cursor: ew-resize;
+    }
+
+    /* Zone 3 target dot */
+    .ix-target {
+      position: absolute; z-index: 10;
+      width: 20px; height: 20px;
+      background: #1a1a1a;
+      border: 2.5px solid rgba(255,255,255,0.75);
+      border-radius: 50%;
+      top: var(--z3-target-top); left: var(--z3-target-left);
+      transform: translate(-50%,-50%);
+      pointer-events: none;
+      transition: transform 0.45s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .ix-target.ix-dragging { transition: none; }
+
+    /* ── Slider ── */
+    .slider-bar {
+      position: absolute; top: 734px; left: 46px; right: 52px; height: 46px;
+      border-radius: 15px; display: flex; align-items: center;
+      justify-content: space-between; padding: 0 14px;
+      cursor: grab; user-select: none; touch-action: none;
+      z-index: 20; background: transparent;
+    }
+    .slider-bar:active { cursor: grabbing; }
+    .arrow-btn { width: 32px; height: 100%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .slider-track-wrap { flex: 1; position: relative; height: 100%; display: flex; align-items: center; }
+    .slider-thumb {
+      position: absolute; left: 0%; top: 50%;
+      transform: translate(-50%, -50%);
+      width: 14px; height: 14px; background: #2c2c2c;
+      border-radius: 50%; pointer-events: none;
+    }
+
+    /* ── Header tap zones ── */
+    .header-btn {
+      position: absolute; top: 32px; width: 44px; height: 44px;
+      z-index: 50; cursor: pointer;
+    }
+    #btnMenu   { left: 12px; }
+    #btnTarget { right: 12px; }
+  </style>
+</head>
+<body>
+<div class="phone" id="phone">
+
+  <!-- 29 rotation frames -->
+  <div class="frame active" data-frame="0"><img src="frames_S/frame_S_01.png" alt=""></div>
+  <div class="frame" data-frame="1"><img src="frames_S/frame_S_02.png" alt=""></div>
+  <div class="frame" data-frame="2"><img src="frames_S/frame_S_03.png" alt=""></div>
+  <div class="frame" data-frame="3"><img src="frames_S/frame_S_04.png" alt=""></div>
+  <div class="frame" data-frame="4"><img src="frames_S/frame_S_05.png" alt=""></div>
+  <div class="frame" data-frame="5"><img src="frames_S/frame_S_06.png" alt=""></div>
+  <div class="frame" data-frame="6"><img src="frames_S/frame_S_07.png" alt=""></div>
+  <div class="frame" data-frame="7"><img src="frames_S/frame_S_08.png" alt=""></div>
+  <div class="frame" data-frame="8"><img src="frames_S/frame_S_09.png" alt=""></div>
+  <div class="frame" data-frame="9"><img src="frames_S/frame_S_10.png" alt=""></div>
+  <div class="frame" data-frame="10"><img src="frames_S/frame_S_11.png" alt=""></div>
+  <div class="frame" data-frame="11"><img src="frames_S/frame_S_12.png" alt=""></div>
+  <div class="frame" data-frame="12"><img src="frames_S/frame_S_13.png" alt=""></div>
+  <div class="frame" data-frame="13"><img src="frames_S/frame_S_14.png" alt=""></div>
+  <div class="frame" data-frame="14"><img src="frames_S/frame_S_15.png" alt=""></div>
+  <div class="frame" data-frame="15"><img src="frames_S/frame_S_16.png" alt=""></div>
+  <div class="frame" data-frame="16"><img src="frames_S/frame_S_17.png" alt=""></div>
+  <div class="frame" data-frame="17"><img src="frames_S/frame_S_18.png" alt=""></div>
+  <div class="frame" data-frame="18"><img src="frames_S/frame_S_19.png" alt=""></div>
+  <div class="frame" data-frame="19"><img src="frames_S/frame_S_20.png" alt=""></div>
+  <div class="frame" data-frame="20"><img src="frames_S/frame_S_21.png" alt=""></div>
+  <div class="frame" data-frame="21"><img src="frames_S/frame_S_22.png" alt=""></div>
+  <div class="frame" data-frame="22"><img src="frames_S/frame_S_23.png" alt=""></div>
+  <div class="frame" data-frame="23"><img src="frames_S/frame_S_24.png" alt=""></div>
+  <div class="frame" data-frame="24"><img src="frames_S/frame_S_25.png" alt=""></div>
+  <div class="frame" data-frame="25"><img src="frames_S/frame_S_26.png" alt=""></div>
+  <div class="frame" data-frame="26"><img src="frames_S/frame_S_27.png" alt=""></div>
+  <div class="frame" data-frame="27"><img src="frames_S/frame_S_28.png" alt=""></div>
+  <div class="frame" data-frame="28"><img src="frames_S/frame_S_29.png" alt=""></div>
+
+  <!-- Spotlights -->
+  <div class="spots-layer" id="spotsLayer">
+    <div class="spot" style="left:110px; top:660px;" data-closeup="1" title="Beine und Füsse">
+      <div class="spot-inner"></div>
+    </div>
+    <div class="spot" style="left:292px; top:362px;" data-closeup="2" title="Hüfte">
+      <div class="spot-inner"></div>
+    </div>
+    <div class="spot" style="left:120px; top:228px;" data-closeup="3" title="Arme">
+      <div class="spot-inner"></div>
+    </div>
+  </div>
+
+  <!-- Closeup screens -->
+  <div class="closeup-layer" id="closeup1"><img src="frames_S/closeup_S_1.png" alt="Beine und Füsse"></div>
+  <div class="closeup-layer" id="closeup2"><img src="frames_S/closeup_S_2.png" alt="Hüfte"></div>
+  <div class="closeup-layer" id="closeup3"><img src="frames_S/closeup_S_3.png" alt="Arme"></div>
+
+  <!-- Text slides — closeup 1 -->
+  <div class="text-layer" id="text1-1" data-closeup="1" data-index="0">
+    <img src="frames_S/text_S_1_1.png" alt=""><div class="mehr-btn" data-closeup="1"></div>
+  </div>
+  <div class="text-layer" id="text1-2" data-closeup="1" data-index="1">
+    <img src="frames_S/text_S_1_2.png" alt=""><div class="mehr-btn" data-closeup="1"></div>
+  </div>
+  <div class="text-layer" id="text1-3" data-closeup="1" data-index="2">
+    <img src="frames_S/text_S_1_3.png" alt=""><div class="mehr-btn" data-closeup="1"></div>
+  </div>
+
+  <!-- Text slides — closeup 2 -->
+  <div class="text-layer" id="text2-1" data-closeup="2" data-index="0">
+    <img src="frames_S/text_S_2_1.png" alt=""><div class="mehr-btn" data-closeup="2"></div>
+  </div>
+
+  <!-- Text slides — closeup 3 -->
+  <div class="text-layer" id="text3-1" data-closeup="3" data-index="0">
+    <img src="frames_S/text_S_3_1.png" alt=""><div class="mehr-btn" data-closeup="3"></div>
+  </div>
+  <div class="text-layer" id="text3-2" data-closeup="3" data-index="1">
+    <img src="frames_S/text_S_3_2.png" alt=""><div class="mehr-btn" data-closeup="3"></div>
+  </div>
+  <div class="text-layer" id="text3-3" data-closeup="3" data-index="2">
+    <img src="frames_S/text_S_3_3.png" alt=""><div class="mehr-btn" data-closeup="3"></div>
+  </div>
+
+  <!-- ── DETAIL 1 — interaktiv version (EXPERIMENT) ── -->
+  <div class="detail-layer" id="detail1">
+    <div class="detail-scroll" id="detailScroll1">
+      <div class="detail-interactive-wrap">
+        <img src="frames_S/detail_S_1_interaktiv.png" alt="Beine und Füsse – interaktiv">
+
+        <!-- ── Zone 1: Problemstellung — footprint pair shifts ← → ── -->
+        <div class="ix-handle ix-z1" id="zone1Handle">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M9 2L4 7l5 5" stroke="#3d7fc1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="#3d7fc1" opacity="0.8">
+            <ellipse cx="10" cy="19" rx="4.5" ry="4.5"/>
+            <ellipse cx="16" cy="16" rx="3.2" ry="3.2"/>
+            <ellipse cx="7.5" cy="12" rx="2.8" ry="4"/>
+            <ellipse cx="12" cy="10" rx="2.8" ry="4"/>
+            <ellipse cx="16.5" cy="11" rx="2.2" ry="3.2"/>
+          </svg>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M5 2l5 5-5 5" stroke="#3d7fc1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+
+        <!-- ── Zone 2: Feinjustierung — rotate ↺ CCW ── -->
+        <div class="ix-handle ix-z2" id="zone2Handle">
+          <span class="ix-z2-label">↺</span>
+        </div>
+
+        <!-- ── Zone 3: Was passiert auf der Scheibe — right foot + target ── -->
+        <div class="ix-handle ix-z3" id="zone3Handle">
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+            <path d="M9 2L4 7l5 5" stroke="#3d7fc1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+            <path d="M5 2l5 5-5 5" stroke="#3d7fc1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="ix-target" id="zone3Target"></div>
+
+      </div><!-- /detail-interactive-wrap -->
+    </div>
+  </div>
+
+  <!-- Detail 2 & 3 — standard scrollable images -->
+  <div class="detail-layer" id="detail2">
+    <div class="detail-scroll">
+      <img src="frames_S/detail_S_2.png" alt="Hüfte – Detail">
+    </div>
+  </div>
+  <div class="detail-layer" id="detail3">
+    <div class="detail-scroll">
+      <img src="frames_S/detail_S_3.png" alt="Arme – Detail">
+    </div>
+  </div>
+
+  <!-- Slider -->
+  <div class="slider-bar" id="sliderBar">
+    <div class="arrow-btn" id="btnLeft"></div>
+    <div class="slider-track-wrap" id="trackWrap">
+      <div class="slider-thumb" id="sliderThumb"></div>
+    </div>
+    <div class="arrow-btn" id="btnRight"></div>
+  </div>
+
+  <!-- Header tap zones -->
+  <div class="header-btn" id="btnMenu"></div>
+  <div class="header-btn" id="btnTarget"></div>
+
+</div>
+
+<script>
+  const TOTAL      = 29;
+  const SPOT_DELAY = 400;
+  const PHONE_W    = 402;
+  const PHONE_H    = 874;
+  const PULL_ZONE           = 80;
+  const PULL_THRESHOLD      = 90;
+  const SWIPE_UP_THRESHOLD  = 30;
+  const TEXT_COUNTS = { '1': 3, '2': 1, '3': 3 };
+
+  const allFrames   = document.querySelectorAll('.frame');
+  const thumb       = document.getElementById('sliderThumb');
+  const sliderBar   = document.getElementById('sliderBar');
+  const trackWrap   = document.getElementById('trackWrap');
+  const spotsLayer  = document.getElementById('spotsLayer');
+  const allCloseups = document.querySelectorAll('.closeup-layer');
+  const allTexts    = document.querySelectorAll('.text-layer');
+
+  let current         = 0;
+  let dragging        = false;
+  let dragStartX      = 0;
+  let dragStartFrame  = 0;
+  let spotTimer       = null;
+  let peekTimer       = null;
+  let activeCloseupId = null;
+  let activeTextIdx   = -1;
+  let activeDetailId  = null;
+
+  // ── Helpers ──────────────────────────────────────────────
+  function getTextEl(closeupId, idx) {
+    return document.getElementById('text' + closeupId + '-' + (idx + 1));
+  }
+
+  // ── Frame switching ──────────────────────────────────────
+  function showFrame(idx) {
+    idx = Math.max(0, Math.min(TOTAL - 1, Math.round(idx)));
+    if (idx === current) return;
+    allFrames[current].classList.remove('active');
+    allFrames[idx].classList.add('active');
+    current = idx;
+    thumb.style.left = (idx / (TOTAL - 1) * 100) + '%';
+  }
+
+  // ── Spotlights ───────────────────────────────────────────
+  function hideSpots() { clearTimeout(spotTimer); spotsLayer.classList.remove('visible'); }
+  function scheduleSpots() {
+    clearTimeout(spotTimer);
+    if (current === 0) spotTimer = setTimeout(() => spotsLayer.classList.add('visible'), SPOT_DELAY);
+  }
+
+  // ── Text slides ──────────────────────────────────────────
+  function startPeek(closeupId) {
+    clearTimeout(peekTimer);
+    if (!TEXT_COUNTS[closeupId]) return;
+    peekTimer = setTimeout(() => {
+      if (activeCloseupId === closeupId && activeTextIdx === -1)
+        getTextEl(closeupId, 0).classList.add('peeking');
+    }, 600);
+  }
+  function stopPeek(closeupId) {
+    clearTimeout(peekTimer);
+    if (TEXT_COUNTS[closeupId]) getTextEl(closeupId, 0).classList.remove('peeking');
+  }
+  function showTextSlide(closeupId, idx) {
+    stopPeek(closeupId);
+    const el = getTextEl(closeupId, idx);
+    el.classList.remove('done', 'peeking');
+    el.classList.add('visible');
+    activeTextIdx = idx;
+  }
+  function resetTextSlides(closeupId) {
+    clearTimeout(peekTimer);
+    const count = TEXT_COUNTS[closeupId] || 0;
+    for (let i = 0; i < count; i++) {
+      const el = getTextEl(closeupId, i);
+      el.classList.remove('visible', 'done', 'peeking', 'swiping');
+      el.style.transform = '';
+    }
+    activeTextIdx = -1;
+  }
+
+  // ── Detail open / close ──────────────────────────────────
+  function openDetail(closeupId) {
+    activeDetailId = closeupId;
+    document.getElementById('detail' + closeupId).classList.add('visible');
+  }
+  function dismissDetail() {
+    if (!activeDetailId) return;
+    const layer = document.getElementById('detail' + activeDetailId);
+    layer.classList.remove('visible');
+    if (activeDetailId === '1') resetZones();
+    setTimeout(() => { layer.querySelector('.detail-scroll').scrollTop = 0; }, 350);
+    activeDetailId = null;
+  }
+
+  // ── Closeup open / close ─────────────────────────────────
+  function openCloseup(id) {
+    hideSpots();
+    activeCloseupId = id;
+    activeTextIdx   = -1;
+    document.getElementById('closeup' + id).classList.add('visible');
+    startPeek(id);
+  }
+  function dismissAllCloseups() {
+    allTexts.forEach(t => { t.classList.remove('visible','done','peeking','swiping'); t.style.transform = ''; });
+    clearTimeout(peekTimer);
+    activeTextIdx = -1; activeCloseupId = null;
+    allCloseups.forEach(l => { l.classList.remove('visible','swiping'); l.style.transform = ''; });
+    scheduleSpots();
+  }
+
+  // ── Slider ───────────────────────────────────────────────
+  sliderBar.addEventListener('pointerdown', e => {
+    dragging = true; dragStartX = e.clientX; dragStartFrame = current;
+    sliderBar.setPointerCapture(e.pointerId); hideSpots(); e.preventDefault();
+  });
+  sliderBar.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const tw = trackWrap.getBoundingClientRect().width;
+    showFrame(dragStartFrame + ((e.clientX - dragStartX) / tw) * (TOTAL - 1));
+  });
+  sliderBar.addEventListener('pointerup',     () => { dragging = false; scheduleSpots(); });
+  sliderBar.addEventListener('pointercancel', () => { dragging = false; scheduleSpots(); });
+  sliderBar.addEventListener('click', e => {
+    if (Math.abs(e.clientX - dragStartX) > 4) return;
+    const rect = trackWrap.getBoundingClientRect();
+    showFrame(Math.round(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * (TOTAL - 1)));
+    scheduleSpots();
+  });
+  document.getElementById('btnLeft').addEventListener('click',  e => { e.stopPropagation(); hideSpots(); showFrame(current - 1); scheduleSpots(); });
+  document.getElementById('btnRight').addEventListener('click', e => { e.stopPropagation(); hideSpots(); showFrame(current + 1); scheduleSpots(); });
+
+  // ── Spot taps ────────────────────────────────────────────
+  document.querySelectorAll('.spot').forEach(spot => {
+    spot.addEventListener('click', () => openCloseup(spot.dataset.closeup));
+  });
+
+  // ── "Mehr" button ────────────────────────────────────────
+  document.querySelectorAll('.mehr-btn').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); openDetail(btn.dataset.closeup); });
+  });
+
+  // ── Header buttons ───────────────────────────────────────
+  document.getElementById('btnTarget').addEventListener('click', () => { dismissDetail(); dismissAllCloseups(); });
+  document.getElementById('btnMenu').addEventListener('click', () => {
+    if (activeDetailId)                         dismissDetail();
+    else if (activeTextIdx >= 0 && activeCloseupId) { resetTextSlides(activeCloseupId); startPeek(activeCloseupId); }
+    else if (activeCloseupId)                   dismissAllCloseups();
+  });
+
+  // ── Closeup gestures ────────────────────────────────────
+  allCloseups.forEach(layer => {
+    let startY = 0, gesture = null;
+    layer.addEventListener('pointerdown', e => { startY = e.clientY; gesture = null; layer.setPointerCapture(e.pointerId); });
+    layer.addEventListener('pointermove', e => {
+      const dy = e.clientY - startY;
+      if (gesture === null && Math.abs(dy) > 8) {
+        const startRelY = startY - layer.getBoundingClientRect().top;
+        if (e.pointerType === 'touch' && startRelY <= PULL_ZONE && dy > 0) { gesture = 'pulldown'; layer.classList.add('swiping'); }
+        else if (dy < 0) gesture = 'swipeup';
+        else gesture = 'none';
+      }
+      if (gesture === 'pulldown' && dy > 0) layer.style.transform = 'translateY(' + dy + 'px)';
+    });
+    layer.addEventListener('pointerup', e => {
+      const dy = e.clientY - startY;
+      if (gesture === 'pulldown') {
+        layer.classList.remove('swiping');
+        if (dy > PULL_THRESHOLD) {
+          const cid = layer.id.replace('closeup', '');
+          layer.style.transform = 'translateY(' + PHONE_H + 'px)';
+          setTimeout(() => { layer.classList.remove('visible'); layer.style.transform = ''; resetTextSlides(cid); activeCloseupId = null; scheduleSpots(); }, 320);
+        } else { layer.style.transform = ''; }
+      } else if (gesture === 'swipeup' && dy < -SWIPE_UP_THRESHOLD) {
+        const cid = layer.id.replace('closeup', '');
+        if (TEXT_COUNTS[cid] && activeTextIdx === -1) showTextSlide(cid, 0);
+      }
+      gesture = null;
+    });
+    layer.addEventListener('pointercancel', () => { if (gesture === 'pulldown') { layer.classList.remove('swiping'); layer.style.transform = ''; } gesture = null; });
+  });
+
+  // ── Text slides: tap to advance (circular) ───────────────
+  allTexts.forEach(layer => {
+    layer.addEventListener('click', e => {
+      const cid = layer.dataset.closeup, idx = parseInt(layer.dataset.index), count = TEXT_COUNTS[cid] || 1;
+      if (layer.classList.contains('peeking')) { showTextSlide(cid, 0); return; }
+      if (e.clientY - layer.getBoundingClientRect().top < PULL_ZONE) return;
+      layer.classList.remove('visible');
+      showTextSlide(cid, (idx + 1) % count);
+    });
+  });
+
+  scheduleSpots();
+
+  // ── Fit phone to viewport ────────────────────────────────
+  function fitPhone() {
+    const s = Math.min(window.innerWidth / PHONE_W, window.innerHeight / PHONE_H, 1);
+    document.getElementById('phone').style.transform = `translate(-50%,-50%) scale(${s})`;
+  }
+  fitPhone();
+  window.addEventListener('resize', fitPhone);
+
+  // ════════════════════════════════════════════════════════
+  //  EXPERIMENT — Three interactive zones
+  //
+  //  Positions are controlled by CSS vars in :root (--z1-*, --z2-*, --z3-*).
+  //  Handles are STICKY — they stay where dragged until detail is closed.
+  //  On close, resetZones() springs all handles back to neutral.
+  // ════════════════════════════════════════════════════════
+
+  function getPhoneScale() {
+    const m = document.getElementById('phone').style.transform.match(/scale\(([^)]+)\)/);
+    return m ? parseFloat(m[1]) : 1;
+  }
+
+  // ── Zone 1: Problemstellung — footprint pair L/R ─────────
+  const zone1 = document.getElementById('zone1Handle');
+  let z1Drag = false, z1StartX = 0, z1Base = 0, z1Off = 0;
+  const Z1_RANGE = 55;
+
+  zone1.addEventListener('pointerdown', e => {
+    z1Drag = true; z1StartX = e.clientX; z1Base = z1Off;
+    zone1.classList.add('ix-dragging');
+    zone1.setPointerCapture(e.pointerId); e.stopPropagation();
+  });
+  zone1.addEventListener('pointermove', e => {
+    if (!z1Drag) return;
+    const dx = (e.clientX - z1StartX) / getPhoneScale();
+    z1Off = Math.max(-Z1_RANGE, Math.min(Z1_RANGE, z1Base + dx));
+    zone1.style.transform = `translate(calc(-50% + ${z1Off}px), -50%)`;
+    e.stopPropagation();
+  });
+  zone1.addEventListener('pointerup',     e => { z1Drag = false; zone1.classList.remove('ix-dragging'); e.stopPropagation(); });
+  zone1.addEventListener('pointercancel', () => { z1Drag = false; zone1.classList.remove('ix-dragging'); });
+
+  // ── Zone 2: Feinjustierung — CCW rotation ────────────────
+  const zone2 = document.getElementById('zone2Handle');
+  let z2Drag = false, z2StartX = 0, z2Base = 0, z2Ang = 0;
+  const Z2_RANGE = 28; // degrees
+
+  zone2.addEventListener('pointerdown', e => {
+    z2Drag = true; z2StartX = e.clientX; z2Base = z2Ang;
+    zone2.classList.add('ix-dragging');
+    zone2.setPointerCapture(e.pointerId); e.stopPropagation();
+  });
+  zone2.addEventListener('pointermove', e => {
+    if (!z2Drag) return;
+    const dx = (e.clientX - z2StartX) / getPhoneScale();
+    // drag left → CCW → negative angle (CSS rotate is clockwise-positive)
+    z2Ang = Math.max(-Z2_RANGE, Math.min(Z2_RANGE, z2Base + dx * 0.4));
+    zone2.style.transform = `translate(-50%,-50%) rotate(${z2Ang}deg)`;
+    e.stopPropagation();
+  });
+  zone2.addEventListener('pointerup',     e => { z2Drag = false; zone2.classList.remove('ix-dragging'); e.stopPropagation(); });
+  zone2.addEventListener('pointercancel', () => { z2Drag = false; zone2.classList.remove('ix-dragging'); });
+
+  // ── Zone 3: Was passiert — right foot + target dot ───────
+  const zone3Foot   = document.getElementById('zone3Handle');
+  const zone3Target = document.getElementById('zone3Target');
+  let z3Drag = false, z3StartX = 0, z3Base = 0, z3Off = 0;
+  const Z3_RANGE = 55;
+
+  zone3Foot.addEventListener('pointerdown', e => {
+    z3Drag = true; z3StartX = e.clientX; z3Base = z3Off;
+    zone3Foot.classList.add('ix-dragging');
+    zone3Target.classList.add('ix-dragging');
+    zone3Foot.setPointerCapture(e.pointerId); e.stopPropagation();
+  });
+  zone3Foot.addEventListener('pointermove', e => {
+    if (!z3Drag) return;
+    const dx = (e.clientX - z3StartX) / getPhoneScale();
+    z3Off = Math.max(-Z3_RANGE, Math.min(Z3_RANGE, z3Base + dx));
+    zone3Foot.style.transform   = `translate(calc(-50% + ${z3Off}px), -50%)`;
+    zone3Target.style.transform = `translate(calc(-50% + ${z3Off}px), -50%)`;
+    e.stopPropagation();
+  });
+  zone3Foot.addEventListener('pointerup', e => {
+    z3Drag = false;
+    zone3Foot.classList.remove('ix-dragging');
+    zone3Target.classList.remove('ix-dragging');
+    e.stopPropagation();
+  });
+  zone3Foot.addEventListener('pointercancel', () => {
+    z3Drag = false;
+    zone3Foot.classList.remove('ix-dragging');
+    zone3Target.classList.remove('ix-dragging');
+  });
+
+  // ── Reset all zones (called when detail1 closes) ─────────
+  function resetZones() {
+    zone1.classList.remove('ix-dragging');
+    zone1.style.transform = ''; z1Off = 0;
+    zone2.classList.remove('ix-dragging');
+    zone2.style.transform = ''; z2Ang = 0;
+    zone3Foot.classList.remove('ix-dragging');
+    zone3Target.classList.remove('ix-dragging');
+    zone3Foot.style.transform   = ''; z3Off = 0;
+    zone3Target.style.transform = '';
+  }
+</script>
+</body>
+</html>

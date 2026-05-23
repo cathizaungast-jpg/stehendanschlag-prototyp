@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Stehendanschlag – v3 (390×844)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #888;
+      margin: 0;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      height: 100svh;
+    }
+
+    /* ── Phone shell ── */
+    .phone {
+      width: 390px;
+      height: 844px;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      transform-origin: center center;
+      overflow: hidden;
+      border-radius: 44px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      background: #f6f6f6;
+    }
+
+    /* ── Rotation frames (SVG) ── */
+    .frame {
+      position: absolute;
+      inset: 0;
+      display: none;
+    }
+    .frame.active { display: block; }
+    .frame img {
+      /* Match Figma: standing-rotation-01 component is 402×874px,
+         centered at left:-6px top:25px in the 390×844 phone frame.
+         The phone's overflow:hidden clips the ~6px horizontal and
+         ~55px bottom overflow, matching Figma's clipping behaviour. */
+      position: absolute;
+      width: 402px;
+      height: 874px;
+      left: -6px;
+      top: 25px;
+      display: block;
+    }
+
+    /* ── Head bar (rotation view) — Figma Head_S: top:64px, flex gap:29px ── */
+    .head-bar {
+      position: absolute;
+      top: 64px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 29px;
+      pointer-events: none;
+      z-index: 10;
+      white-space: nowrap;
+    }
+    .head-bar-title {
+      width: 240px;
+      font-family: 'Neue Haas Unica W1G', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-weight: 500;
+      font-size: 16px;
+      line-height: 1;
+      color: #2c2c2c;
+      text-align: center;
+    }
+
+    /* ── Spotlights ── */
+    .spots-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 15;
+    }
+    .spots-layer.visible { pointer-events: auto; }
+
+    /* Spot: 44×44 tap zone, centered on the Figma coordinate */
+    .spot {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.6s ease;
+    }
+    .spots-layer.visible .spot { opacity: 1; }
+
+    /* Figma spot.svg: 28×28px (20px base + 4px shadow bleed on each side) */
+    .spot-visual {
+      width: 28px;
+      height: 28px;
+      pointer-events: none;
+      filter: drop-shadow(0 0 4px rgba(26,103,182,0.4));
+    }
+    /* Pulse animation on the white outer ring */
+    .spots-layer.visible .spot-visual {
+      animation: pulse 2.2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { filter: drop-shadow(0 0 3px rgba(26,103,182,0.35)); }
+      50%       { filter: drop-shadow(0 0 9px rgba(26,103,182,0.55)); }
+    }
+
+    /* ── Closeup overlays ── */
+    .closeup-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 30;
+      transform: translateX(100%);
+      transition: transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      pointer-events: none;
+    }
+    .closeup-layer.visible {
+      transform: translateX(0);
+      pointer-events: auto;
+    }
+    .closeup-layer.swiping { transition: none; }
+    .closeup-layer img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: fill;
+    }
+
+    /* ── Text slide layers ── */
+    .text-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 35;
+      transform: translateY(100%);
+      opacity: 0;
+      pointer-events: none;
+      cursor: pointer;
+    }
+    .text-layer img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: fill;
+    }
+    .text-layer.peeking {
+      opacity: 1;
+      transform: translateY(calc(100% - 28px));
+      animation: text-peek 1.4s ease-in-out infinite;
+      pointer-events: auto;
+    }
+    .text-layer.peeking::before {
+      content: '';
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 44px;
+      height: 5px;
+      background: #2A6192;
+      border-radius: 3px;
+      opacity: 0.85;
+      z-index: 2;
+    }
+    @keyframes text-peek {
+      0%, 100% { transform: translateY(calc(100% - 28px)); }
+      50%       { transform: translateY(calc(100% - 68px)); }
+    }
+    .text-layer.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      animation: none;
+      transition: opacity 0.6s ease;
+    }
+
+    /* ── "Mehr" tap zone (opens detail onepager) ──
+       Figma: "mehr" text sits at top:90.28% = 762px in the 390×844 frame.
+       Tap zone is centred on that Y, wide enough for comfortable tapping. */
+    .mehr-btn {
+      position: absolute;
+      top: 742px;    /* 762px "mehr" centre − 20px = comfortable zone start */
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100px;
+      height: 50px;
+      z-index: 3;
+      cursor: pointer;
+    }
+
+    /* ── Detail screens (scrollable onepagers) ── */
+    .detail-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 40;
+      transform: translateX(100%);
+      transition: transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      pointer-events: none;
+      background: #f6f6f6;
+    }
+    .detail-layer.visible {
+      transform: translateX(0);
+      pointer-events: auto;
+    }
+
+    /* ── Sticky Head inside detail — Figma Head_S (back arrow + title + target)
+       Position from Figma: x:31 y:52 w:340 h:24, gap:29px
+    ── */
+    .detail-head {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 90px;
+      background: rgba(246,246,246,0.76);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 5;
+      pointer-events: none;
+    }
+    .detail-head-inner {
+      position: absolute;
+      top: 52px; left: 31px; width: 340px; height: 24px;
+      display: flex; align-items: center; gap: 29px;
+    }
+    .detail-head-menu  { width: 18px; height: 13px; flex-shrink: 0; }
+    .detail-head-title {
+      width: 240px; flex-shrink: 0;
+      font-family: 'Neue Haas Unica W1G', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-weight: 500; font-size: 16px; line-height: 1;
+      color: #2c2c2c; text-align: center; white-space: nowrap;
+    }
+    .detail-head-home  { width: 24px; height: 24px; flex-shrink: 0; }
+
+    .detail-scroll {
+      width: 100%;
+      height: 100%;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    /* Wrapper so the Zurück tap zone can be positioned over the image */
+    .detail-img-wrap { position: relative; width: 100%; }
+    .detail-img-wrap > img { width: 100%; height: auto; display: block; }
+
+    /* Transparent tap zone over the baked-in "Zurück" button in the screenshot */
+    .zurück-tap {
+      position: absolute;
+      bottom: 26px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 150px;
+      height: 66px;
+      cursor: pointer;
+      z-index: 2;
+    }
+
+    /* ── Slider — Figma inset: 90.28% 12.94% 4.45% 11.44% of 390×844 ── */
+    .slider-bar {
+      position: absolute;
+      top:    762px;   /* 90.28% × 844 */
+      left:    45px;   /* 11.44% × 390 */
+      right:   51px;   /* 12.94% × 390 */
+      height:  44px;   /* remaining */
+      border-radius: 15px;
+      background: rgba(237,237,237,0.9);
+      border: 1px solid #b4b9c1;
+      box-shadow: 0 0 2px rgba(0,0,0,0.25);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+      z-index: 20;
+    }
+    .slider-bar:active { cursor: grabbing; }
+    .arrow-btn {
+      width: 32px;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .slider-track-wrap {
+      flex: 1;
+      position: relative;
+      height: 100%;
+      display: flex;
+      align-items: center;
+    }
+    .slider-thumb {
+      position: absolute;
+      left: 0%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 14px;
+      height: 14px;
+      background: #2c2c2c;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    /* ── Arrow SVGs in slider ── */
+    .arrow-icon {
+      width: 20px;
+      height: 14px;
+      flex-shrink: 0;
+    }
+
+    /* ── Header tap zones (always at z-index 50, on top of everything) ── */
+    .header-btn {
+      position: absolute;
+      top: 54px;    /* center at y≈76 matching Head_S top:64 + half-height */
+      width: 44px;
+      height: 44px;
+      z-index: 50;
+      cursor: pointer;
+    }
+    #btnMenu   { left: 12px; }
+    #btnTarget { right: 12px; }
+  </style>
+</head>
+<body>
+<div class="phone" id="phone">
+
+  <!-- 29 rotation frames using SVG files (Figma vers-3 exports, 390×844) -->
+  <div class="frame active" data-frame="0"><img src="svg/standing-rotation-01.svg" alt=""></div>
+  <div class="frame" data-frame="1"><img src="svg/standing-rotation-02.svg" alt=""></div>
+  <div class="frame" data-frame="2"><img src="svg/standing-rotation-03.svg" alt=""></div>
+  <div class="frame" data-frame="3"><img src="svg/standing-rotation-04.svg" alt=""></div>
+  <div class="frame" data-frame="4"><img src="svg/standing-rotation-05.svg" alt=""></div>
+  <div class="frame" data-frame="5"><img src="svg/standing-rotation-06.svg" alt=""></div>
+  <div class="frame" data-frame="6"><img src="svg/standing-rotation-07.svg" alt=""></div>
+  <div class="frame" data-frame="7"><img src="svg/standing-rotation-08.svg" alt=""></div>
+  <div class="frame" data-frame="8"><img src="svg/standing-rotation-09.svg" alt=""></div>
+  <div class="frame" data-frame="9"><img src="svg/standing-rotation-10.svg" alt=""></div>
+  <div class="frame" data-frame="10"><img src="svg/standing-rotation-11.svg" alt=""></div>
+  <div class="frame" data-frame="11"><img src="svg/standing-rotation-12.svg" alt=""></div>
+  <div class="frame" data-frame="12"><img src="svg/standing-rotation-13.svg" alt=""></div>
+  <div class="frame" data-frame="13"><img src="svg/standing-rotation-14.svg" alt=""></div>
+  <div class="frame" data-frame="14"><img src="svg/standing-rotation-15.svg" alt=""></div>
+  <div class="frame" data-frame="15"><img src="svg/standing-rotation-16.svg" alt=""></div>
+  <div class="frame" data-frame="16"><img src="svg/standing-rotation-17.svg" alt=""></div>
+  <div class="frame" data-frame="17"><img src="svg/standing-rotation-18.svg" alt=""></div>
+  <div class="frame" data-frame="18"><img src="svg/standing-rotation-19.svg" alt=""></div>
+  <div class="frame" data-frame="19"><img src="svg/standing-rotation-20.svg" alt=""></div>
+  <div class="frame" data-frame="20"><img src="svg/standing-rotation-21.svg" alt=""></div>
+  <div class="frame" data-frame="21"><img src="svg/standing-rotation-22.svg" alt=""></div>
+  <div class="frame" data-frame="22"><img src="svg/standing-rotation-23.svg" alt=""></div>
+  <div class="frame" data-frame="23"><img src="svg/standing-rotation-24.svg" alt=""></div>
+  <div class="frame" data-frame="24"><img src="svg/standing-rotation-25.svg" alt=""></div>
+  <div class="frame" data-frame="25"><img src="svg/standing-rotation-26.svg" alt=""></div>
+  <div class="frame" data-frame="26"><img src="svg/standing-rotation-27.svg" alt=""></div>
+  <div class="frame" data-frame="27"><img src="svg/standing-rotation-28.svg" alt=""></div>
+  <div class="frame" data-frame="28"><img src="svg/standing-rotation-29.svg" alt=""></div>
+
+  <!-- Head bar — visible on rotation frames, covered by closeup/detail layers -->
+  <div class="head-bar" id="headBar">
+    <!-- Hamburger menu icon -->
+    <svg width="18" height="13" viewBox="0 0 18 13" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <line x1="0" y1="1"   x2="18" y2="1"   stroke="#2c2c2c" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="0" y1="6.5" x2="18" y2="6.5" stroke="#2c2c2c" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="0" y1="12"  x2="18" y2="12"  stroke="#2c2c2c" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+    <span class="head-bar-title">Stehendanschlag</span>
+    <!-- Target / home icon -->
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.8" stroke="#2A6192" stroke-width="2"/>
+      <line x1="12" y1="17.6" x2="12" y2="24"  stroke="#2A6192" stroke-width="2"/>
+      <line x1="12" y1="0"    x2="12" y2="6.4"  stroke="#2A6192" stroke-width="2"/>
+      <line x1="0"  y1="12"   x2="6.4" y2="12"  stroke="#2A6192" stroke-width="2"/>
+      <line x1="17.6" y1="12" x2="24"  y2="12"  stroke="#2A6192" stroke-width="2"/>
+      <circle cx="12" cy="12" r="4" fill="#2A6192"/>
+    </svg>
+  </div>
+
+  <!-- Spotlights — exact positions from Figma nav-f1_S (node 368:40431)
+       Each spot is a 20×20 element; center coords: left+10, top+10
+       Spot 1: left:72 top:700  → center (82, 710)  → Beine und Füsse
+       Spot 2: left:295 top:408 → center (305, 418) → Hüfte
+       Spot 3: left:94 top:239  → center (104, 249) → Arme
+  -->
+  <div class="spots-layer" id="spotsLayer">
+    <div class="spot" style="left:82px; top:710px;" data-closeup="1" title="Beine und Füsse">
+      <img src="frames_v3/spot.svg" class="spot-visual" alt="">
+    </div>
+    <div class="spot" style="left:305px; top:418px;" data-closeup="2" title="Hüfte">
+      <img src="frames_v3/spot.svg" class="spot-visual" alt="">
+    </div>
+    <div class="spot" style="left:104px; top:249px;" data-closeup="3" title="Arme">
+      <img src="frames_v3/spot.svg" class="spot-visual" alt="">
+    </div>
+  </div>
+
+  <!-- Closeup screens (390×844 Figma screenshots from vers-3) -->
+  <div class="closeup-layer" id="closeup1">
+    <img src="frames_v3/closeup_1.png" alt="Beine und Füsse">
+  </div>
+  <div class="closeup-layer" id="closeup2">
+    <img src="frames_v3/closeup_2.png" alt="Hüfte">
+  </div>
+  <div class="closeup-layer" id="closeup3">
+    <img src="frames_v3/closeup_3.png" alt="Arme">
+  </div>
+
+  <!-- Text slides — section 1 (Beine): 3 slides -->
+  <div class="text-layer" id="text1-1" data-closeup="1" data-index="0">
+    <img src="frames_v3/text_1_1.png" alt="">
+    <div class="mehr-btn" data-closeup="1"></div>
+  </div>
+  <div class="text-layer" id="text1-2" data-closeup="1" data-index="1">
+    <img src="frames_v3/text_1_2.png" alt="">
+    <div class="mehr-btn" data-closeup="1"></div>
+  </div>
+  <div class="text-layer" id="text1-3" data-closeup="1" data-index="2">
+    <img src="frames_v3/text_1_3.png" alt="">
+    <div class="mehr-btn" data-closeup="1"></div>
+  </div>
+
+  <!-- Text slides — section 2 (Hüfte): 1 slide -->
+  <div class="text-layer" id="text2-1" data-closeup="2" data-index="0">
+    <img src="frames_v3/text_2_1.png" alt="">
+    <div class="mehr-btn" data-closeup="2"></div>
+  </div>
+
+  <!-- Text slides — section 3 (Arme): 3 slides -->
+  <div class="text-layer" id="text3-1" data-closeup="3" data-index="0">
+    <img src="frames_v3/text_3_1.png" alt="">
+    <div class="mehr-btn" data-closeup="3"></div>
+  </div>
+  <div class="text-layer" id="text3-2" data-closeup="3" data-index="1">
+    <img src="frames_v3/text_3_2.png" alt="">
+    <div class="mehr-btn" data-closeup="3"></div>
+  </div>
+  <div class="text-layer" id="text3-3" data-closeup="3" data-index="2">
+    <img src="frames_v3/text_3_3.png" alt="">
+    <div class="mehr-btn" data-closeup="3"></div>
+  </div>
+
+  <!-- Shared SVG icons for all detail heads -->
+  <svg style="display:none">
+    <!-- Back arrow: two stroked paths, consistent 2px stroke weight -->
+    <symbol id="icon-back" viewBox="0 0 20 14">
+      <line x1="1" y1="7" x2="19" y2="7" stroke="#2A6192" stroke-width="2" stroke-linecap="round"/>
+      <path d="M8 1L1 7l7 6" stroke="#2A6192" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </symbol>
+    <!-- Target / home icon -->
+    <symbol id="icon-target" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8.8" stroke="#2A6192" stroke-width="2" fill="none"/>
+      <line x1="12" y1="17.6" x2="12" y2="24"  stroke="#2A6192" stroke-width="2"/>
+      <line x1="12" y1="0"    x2="12" y2="6.4"  stroke="#2A6192" stroke-width="2"/>
+      <line x1="0"  y1="12"   x2="6.4" y2="12"  stroke="#2A6192" stroke-width="2"/>
+      <line x1="17.6" y1="12" x2="24"  y2="12"  stroke="#2A6192" stroke-width="2"/>
+      <circle cx="12" cy="12" r="4" fill="#2A6192"/>
+    </symbol>
+  </svg>
+
+  <!-- Detail onepagers (scrollable, tall Figma screenshots) -->
+  <div class="detail-layer" id="detail1">
+    <div class="detail-head">
+      <div class="detail-head-inner">
+        <svg class="detail-head-menu"><use href="#icon-back"/></svg>
+        <span class="detail-head-title">Beine und Füsse</span>
+        <svg class="detail-head-home"><use href="#icon-target"/></svg>
+      </div>
+    </div>
+    <div class="detail-scroll">
+      <div class="detail-img-wrap">
+        <img src="frames_v3/detail_1.png" alt="Beine und Füsse – Detail">
+        <div class="zurück-tap"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-layer" id="detail2">
+    <div class="detail-head">
+      <div class="detail-head-inner">
+        <svg class="detail-head-menu"><use href="#icon-back"/></svg>
+        <span class="detail-head-title">Hüfte</span>
+        <svg class="detail-head-home"><use href="#icon-target"/></svg>
+      </div>
+    </div>
+    <div class="detail-scroll">
+      <div class="detail-img-wrap">
+        <img src="frames_v3/detail_2.png" alt="Hüfte – Detail">
+        <div class="zurück-tap"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-layer" id="detail3">
+    <div class="detail-head">
+      <div class="detail-head-inner">
+        <svg class="detail-head-menu"><use href="#icon-back"/></svg>
+        <span class="detail-head-title">Arme</span>
+        <svg class="detail-head-home"><use href="#icon-target"/></svg>
+      </div>
+    </div>
+    <div class="detail-scroll">
+      <div class="detail-img-wrap">
+        <img src="frames_v3/detail_3.png" alt="Arme – Detail">
+        <div class="zurück-tap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slider — Figma Slider component, rendered in HTML -->
+  <div class="slider-bar" id="sliderBar">
+    <div class="arrow-btn" id="btnLeft">
+      <!-- Left arrow ← -->
+      <svg class="arrow-icon" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <line x1="19" y1="7" x2="1" y2="7" stroke="#2c2c2c" stroke-width="2" stroke-linecap="round"/>
+        <path d="M8 1L1 7l7 6" stroke="#2c2c2c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+    </div>
+    <div class="slider-track-wrap" id="trackWrap">
+      <div class="slider-thumb" id="sliderThumb"></div>
+    </div>
+    <div class="arrow-btn" id="btnRight">
+      <!-- Right arrow → -->
+      <svg class="arrow-icon" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <line x1="1" y1="7" x2="19" y2="7" stroke="#2c2c2c" stroke-width="2" stroke-linecap="round"/>
+        <path d="M12 1L19 7l-7 6" stroke="#2c2c2c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Invisible header tap zones — always z-index 50, intercept all states -->
+  <div class="header-btn" id="btnMenu"></div>
+  <div class="header-btn" id="btnTarget"></div>
+
+</div><!-- /.phone -->
+
+<script>
+  const TOTAL      = 29;
+  const SPOT_DELAY = 400;   /* ms after slider release before spots appear */
+  const PHONE_W    = 390;
+  const PHONE_H    = 844;
+  const PULL_ZONE           = 80;   /* px from top of closeup where pull-down starts */
+  const PULL_THRESHOLD      = 90;   /* px drag needed to dismiss closeup */
+  const SWIPE_UP_THRESHOLD  = 30;   /* px upward swipe to reveal first text slide */
+
+  /* Text slide counts per section */
+  const TEXT_COUNTS = { '1': 3, '2': 1, '3': 3 };
+
+  const phone       = document.getElementById('phone');
+  const allFrames   = document.querySelectorAll('.frame');
+  const thumb       = document.getElementById('sliderThumb');
+  const sliderBar   = document.getElementById('sliderBar');
+  const trackWrap   = document.getElementById('trackWrap');
+  const spotsLayer  = document.getElementById('spotsLayer');
+  const allCloseups = document.querySelectorAll('.closeup-layer');
+  const allTexts    = document.querySelectorAll('.text-layer');
+
+  let current         = 0;
+  let dragging        = false;
+  let dragStartX      = 0;
+  let dragStartFrame  = 0;
+  let spotTimer       = null;
+  let peekTimer       = null;
+  let activeCloseupId = null;
+  let activeTextIdx   = -1;
+  let activeDetailId  = null;
+
+  function getTextEl(closeupId, idx) {
+    return document.getElementById('text' + closeupId + '-' + (idx + 1));
+  }
+
+  /* ── Frame switching ──────────────────────────────────────── */
+  function showFrame(idx) {
+    idx = Math.max(0, Math.min(TOTAL - 1, Math.round(idx)));
+    if (idx === current) return;
+    allFrames[current].classList.remove('active');
+    allFrames[idx].classList.add('active');
+    current = idx;
+    thumb.style.left = (idx / (TOTAL - 1) * 100) + '%';
+  }
+
+  /* ── Spotlights ──────────────────────────────────────────── */
+  function hideSpots()  { clearTimeout(spotTimer); spotsLayer.classList.remove('visible'); }
+  function scheduleSpots() {
+    clearTimeout(spotTimer);
+    if (current === 0) spotTimer = setTimeout(() => spotsLayer.classList.add('visible'), SPOT_DELAY);
+  }
+
+  /* ── Text slides ──────────────────────────────────────────── */
+  function startPeek(closeupId) {
+    clearTimeout(peekTimer);
+    if (!TEXT_COUNTS[closeupId]) return;
+    peekTimer = setTimeout(() => {
+      if (activeCloseupId === closeupId && activeTextIdx === -1)
+        getTextEl(closeupId, 0).classList.add('peeking');
+    }, 600);
+  }
+  function stopPeek(closeupId) {
+    clearTimeout(peekTimer);
+    if (TEXT_COUNTS[closeupId]) getTextEl(closeupId, 0).classList.remove('peeking');
+  }
+  function showTextSlide(closeupId, idx) {
+    stopPeek(closeupId);
+    const el = getTextEl(closeupId, idx);
+    el.classList.remove('done', 'peeking');
+    el.classList.add('visible');
+    activeTextIdx = idx;
+  }
+  function resetTextSlides(closeupId) {
+    clearTimeout(peekTimer);
+    const count = TEXT_COUNTS[closeupId] || 0;
+    for (let i = 0; i < count; i++) {
+      const el = getTextEl(closeupId, i);
+      if (el) el.classList.remove('visible', 'done', 'peeking', 'swiping');
+      if (el) el.style.transform = '';
+    }
+    activeTextIdx = -1;
+  }
+
+  /* ── Detail open / close ───────────────────────────────────── */
+  function openDetail(closeupId) {
+    activeDetailId = closeupId;
+    document.getElementById('detail' + closeupId).classList.add('visible');
+  }
+  function dismissDetail() {
+    if (!activeDetailId) return;
+    const layer = document.getElementById('detail' + activeDetailId);
+    layer.classList.remove('visible');
+    setTimeout(() => { layer.querySelector('.detail-scroll').scrollTop = 0; }, 350);
+    activeDetailId = null;
+  }
+
+  /* ── Closeup open / close ──────────────────────────────────── */
+  function openCloseup(id) {
+    hideSpots();
+    activeCloseupId = id;
+    activeTextIdx   = -1;
+    document.getElementById('closeup' + id).classList.add('visible');
+    startPeek(id);
+  }
+  function dismissAllCloseups() {
+    allTexts.forEach(t => {
+      t.classList.remove('visible', 'done', 'peeking', 'swiping');
+      t.style.transform = '';
+    });
+    clearTimeout(peekTimer);
+    activeTextIdx = -1; activeCloseupId = null;
+    allCloseups.forEach(l => { l.classList.remove('visible', 'swiping'); l.style.transform = ''; });
+    scheduleSpots();
+  }
+
+  /* ── Scale compensation for drag gestures ───────────────────
+     The phone may be scaled down on desktop (fitPhone). Pointer
+     coordinates are in screen px; we need phone-local px for
+     distance calculations.
+  ─────────────────────────────────────────────────────────────── */
+  function getScale() {
+    const m = phone.style.transform.match(/scale\(([^)]+)\)/);
+    return m ? parseFloat(m[1]) : 1;
+  }
+
+  /* ── Slider ──────────────────────────────────────────────── */
+  sliderBar.addEventListener('pointerdown', e => {
+    dragging = true; dragStartX = e.clientX; dragStartFrame = current;
+    sliderBar.setPointerCapture(e.pointerId); hideSpots(); e.preventDefault();
+  });
+  sliderBar.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    /* getBoundingClientRect() and clientX are both in screen-px, so scale cancels */
+    const tw = trackWrap.getBoundingClientRect().width;
+    showFrame(dragStartFrame + ((e.clientX - dragStartX) / tw) * (TOTAL - 1));
+  });
+  sliderBar.addEventListener('pointerup',     () => { dragging = false; scheduleSpots(); });
+  sliderBar.addEventListener('pointercancel', () => { dragging = false; scheduleSpots(); });
+  sliderBar.addEventListener('click', e => {
+    if (Math.abs(e.clientX - dragStartX) > 4) return;
+    const rect = trackWrap.getBoundingClientRect();
+    showFrame(Math.round(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * (TOTAL - 1)));
+    scheduleSpots();
+  });
+
+  document.getElementById('btnLeft').addEventListener('click', e => {
+    e.stopPropagation(); hideSpots(); showFrame(current - 1); scheduleSpots();
+  });
+  document.getElementById('btnRight').addEventListener('click', e => {
+    e.stopPropagation(); hideSpots(); showFrame(current + 1); scheduleSpots();
+  });
+
+  /* ── Spot taps ─────────────────────────────────────────────── */
+  document.querySelectorAll('.spot').forEach(spot => {
+    spot.addEventListener('click', () => openCloseup(spot.dataset.closeup));
+  });
+
+  /* ── "Mehr" button ─────────────────────────────────────────── */
+  document.querySelectorAll('.mehr-btn').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); openDetail(btn.dataset.closeup); });
+  });
+
+  /* ── Header buttons (z-50, intercept all states) ─────────────
+     Target icon → always go all the way back to rotation
+     Menu/back   → context-sensitive back one level
+  ─────────────────────────────────────────────────────────────── */
+  document.getElementById('btnTarget').addEventListener('click', () => {
+    dismissDetail(); dismissAllCloseups();
+  });
+  document.getElementById('btnMenu').addEventListener('click', () => {
+    if (activeDetailId)                              dismissDetail();
+    else if (activeTextIdx >= 0 && activeCloseupId) { resetTextSlides(activeCloseupId); startPeek(activeCloseupId); }
+    else if (activeCloseupId)                        dismissAllCloseups();
+  });
+
+  /* ── Closeup gestures: pull down to dismiss, swipe up for text ── */
+  allCloseups.forEach(layer => {
+    let startY = 0, gesture = null;
+    layer.addEventListener('pointerdown', e => {
+      startY = e.clientY; gesture = null; layer.setPointerCapture(e.pointerId);
+    });
+    layer.addEventListener('pointermove', e => {
+      const dy = (e.clientY - startY) / getScale();
+      if (gesture === null && Math.abs(dy) > 8) {
+        const startRelY = (startY - layer.getBoundingClientRect().top) / getScale();
+        if (e.pointerType === 'touch' && startRelY <= PULL_ZONE && dy > 0) {
+          gesture = 'pulldown'; layer.classList.add('swiping');
+        } else if (dy < 0) gesture = 'swipeup';
+        else gesture = 'none';
+      }
+      if (gesture === 'pulldown' && dy > 0) layer.style.transform = 'translateY(' + dy + 'px)';
+    });
+    layer.addEventListener('pointerup', e => {
+      const dy = (e.clientY - startY) / getScale();
+      if (gesture === 'pulldown') {
+        layer.classList.remove('swiping');
+        if (dy > PULL_THRESHOLD) {
+          const cid = layer.id.replace('closeup', '');
+          layer.style.transform = 'translateY(' + PHONE_H + 'px)';
+          setTimeout(() => {
+            layer.classList.remove('visible'); layer.style.transform = '';
+            resetTextSlides(cid); activeCloseupId = null; scheduleSpots();
+          }, 320);
+        } else { layer.style.transform = ''; }
+      } else if (gesture === 'swipeup' && dy < -SWIPE_UP_THRESHOLD) {
+        const cid = layer.id.replace('closeup', '');
+        if (TEXT_COUNTS[cid] && activeTextIdx === -1) showTextSlide(cid, 0);
+      }
+      gesture = null;
+    });
+    layer.addEventListener('pointercancel', () => {
+      if (gesture === 'pulldown') { layer.classList.remove('swiping'); layer.style.transform = ''; }
+      gesture = null;
+    });
+  });
+
+  /* ── Text slides: tap to advance (circular) ─────────────────── */
+  allTexts.forEach(layer => {
+    layer.addEventListener('click', e => {
+      const cid = layer.dataset.closeup, idx = parseInt(layer.dataset.index), count = TEXT_COUNTS[cid] || 1;
+      if (layer.classList.contains('peeking')) { showTextSlide(cid, 0); return; }
+      const relY = (e.clientY - layer.getBoundingClientRect().top) / getScale();
+      if (relY < PULL_ZONE) return; /* top area reserved for pull-down */
+      layer.classList.remove('visible');
+      showTextSlide(cid, (idx + 1) % count);
+    });
+  });
+
+  /* ── "Zurück" tap zone at bottom of detail onepagers ──────────
+     Returns all the way back to rotation view
+  ─────────────────────────────────────────────────────────────── */
+  document.querySelectorAll('.zurück-tap').forEach(tap => {
+    tap.addEventListener('click', e => {
+      e.stopPropagation();
+      dismissDetail();
+      dismissAllCloseups();
+    });
+  });
+
+  /* ── Initial spot scheduling ─────────────────────────────────── */
+  scheduleSpots();
+
+  /* ── Fit phone to viewport on desktop ───────────────────────── */
+  function fitPhone() {
+    const s = Math.min(window.innerWidth / PHONE_W, window.innerHeight / PHONE_H, 1);
+    phone.style.transform = `translate(-50%,-50%) scale(${s})`;
+  }
+  fitPhone();
+  window.addEventListener('resize', fitPhone);
+</script>
+</body>
+</html>

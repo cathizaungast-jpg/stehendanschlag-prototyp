@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stehendanschlag – Statisch (S)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #888;
+      margin: 0;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      height: 100svh;
+    }
+
+    .phone {
+      width: 402px;
+      height: 874px;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      transform-origin: center center;
+      overflow: hidden;
+      border-radius: 44px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      background: #f6f6f6;
+    }
+
+    /* ── Rotation frames ── */
+    .frame {
+      position: absolute;
+      inset: 0;
+      display: none;
+    }
+    .frame.active { display: block; }
+    .frame img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: fill;
+    }
+
+    /* ── Spotlights ── */
+    .spots-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 15;
+    }
+    .spots-layer.visible { pointer-events: auto; }
+
+    .spot {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.6s ease;
+    }
+    .spots-layer.visible .spot { opacity: 1; }
+
+    .spot-inner {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #3d7fc1;
+      border: 2.5px solid rgba(255,255,255,0.9);
+      box-shadow: 0 0 0 3px rgba(61,127,193,0.35);
+    }
+    .spots-layer.visible .spot-inner {
+      animation: pulse 2.2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 3px rgba(61,127,193,0.35); }
+      50%       { box-shadow: 0 0 0 9px rgba(61,127,193,0.12); }
+    }
+    .spot:active .spot-inner { background: #2a5f99; }
+
+    /* ── Closeup overlays ── */
+    .closeup-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 30;
+      transform: translateX(100%);
+      transition: transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      display: block;
+      pointer-events: none;
+    }
+    .closeup-layer.visible {
+      transform: translateX(0);
+      pointer-events: auto;
+    }
+    .closeup-layer.swiping {
+      transition: none;
+    }
+    .closeup-layer img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: fill;
+    }
+
+    /* ── Text slide layers ── */
+    .text-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 35;
+      transform: translateY(100%);
+      opacity: 0;
+      pointer-events: none;
+      cursor: pointer;
+    }
+    .text-layer img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: fill;
+    }
+    .text-layer.peeking {
+      opacity: 1;
+      transform: translateY(calc(100% - 28px));
+      animation: text-peek 1.4s ease-in-out infinite;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    .text-layer.peeking::before {
+      content: '';
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 44px;
+      height: 5px;
+      background: #3d7fc1;
+      border-radius: 3px;
+      opacity: 0.85;
+      z-index: 2;
+    }
+    @keyframes text-peek {
+      0%, 100% { transform: translateY(calc(100% - 28px)); }
+      50%       { transform: translateY(calc(100% - 68px)); }
+    }
+    .text-layer.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      animation: none;
+      transition: opacity 0.6s ease;
+    }
+
+    /* ── "Mehr" tap zone ── */
+    .mehr-btn {
+      position: absolute;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80px;
+      height: 36px;
+      z-index: 3;
+      cursor: pointer;
+    }
+
+    /* ── Detail screens (scrollable onepagers) ── */
+    .detail-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 40;
+      transform: translateX(100%);
+      transition: transform 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      pointer-events: none;
+      background: #f6f6f6;
+    }
+    .detail-layer.visible {
+      transform: translateX(0);
+      pointer-events: auto;
+    }
+
+    /* ── Sticky Head — replicates Figma "Head_S" component ──────────────
+       Head_S lives at x:31 y:52 w:340 h:24 inside the 402×874 phone frame.
+       Pinned above the scrolling detail image; tap zones (z-50) sit on top.
+    ── */
+    .detail-head {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 90px;                          /* covers the head area with room */
+      background: rgba(246,246,246,0.72);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 5;
+      pointer-events: none;                  /* btnMenu / btnTarget (z-50) handle taps */
+    }
+    /* Inner row — matches Figma: left:31 top:52 width:340 height:24 gap:29 */
+    .detail-head-inner {
+      position: absolute;
+      top: 52px; left: 31px; width: 340px; height: 24px;
+      display: flex; align-items: center; gap: 29px;
+    }
+    .detail-head-menu  { width: 18px; height: 13px; flex-shrink: 0; } /* back arrow: viewBox 20×14.73 → 18×13px */
+    .detail-head-title {
+      width: 240px; flex-shrink: 0;
+      font-family: 'Neue Haas Unica W1G', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-weight: 500; font-size: 16px; line-height: 1;
+      color: #2c2c2c; text-align: center; white-space: nowrap;
+    }
+    .detail-head-home  { width: 24px; height: 24px; flex-shrink: 0; }
+
+    .detail-scroll {
+      width: 100%;
+      height: 100%;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    /* Wrapper so the Zurück tap zone can be positioned over the image */
+    .detail-img-wrap {
+      position: relative;
+      width: 100%;
+    }
+    .detail-img-wrap > img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* Transparent tap zone over the "Zurück" button in the PNG */
+    .zurück-tap {
+      position: absolute;
+      bottom: 26px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 150px;
+      height: 66px;
+      cursor: pointer;
+      z-index: 2;
+    }
+
+    /* ── Slider ── */
+    .slider-bar {
+      position: absolute;
+      top:    734px;
+      left:   46px;
+      right:  52px;
+      height: 46px;
+      border-radius: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+      z-index: 20;
+      background: transparent;
+    }
+    .slider-bar:active { cursor: grabbing; }
+    .arrow-btn {
+      width: 32px;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .slider-track-wrap {
+      flex: 1;
+      position: relative;
+      height: 100%;
+      display: flex;
+      align-items: center;
+    }
+    .slider-thumb {
+      position: absolute;
+      left: 0%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 14px;
+      height: 14px;
+      background: #2c2c2c;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    /* ── Header tap zones ── */
+    .header-btn {
+      position: absolute;
+      top: 32px;
+      width: 44px;
+      height: 44px;
+      z-index: 50;
+      cursor: pointer;
+    }
+    #btnMenu   { left: 12px; }
+    #btnTarget { right: 12px; }
+  </style>
+</head>
+<body>
+<div class="phone" id="phone">
+
+  <!-- 29 rotation frames -->
+  <div class="frame active" data-frame="0"><img src="frames_S/frame_S_01.png" alt=""></div>
+  <div class="frame" data-frame="1"><img src="frames_S/frame_S_02.png" alt=""></div>
+  <div class="frame" data-frame="2"><img src="frames_S/frame_S_03.png" alt=""></div>
+  <div class="frame" data-frame="3"><img src="frames_S/frame_S_04.png" alt=""></div>
+  <div class="frame" data-frame="4"><img src="frames_S/frame_S_05.png" alt=""></div>
+  <div class="frame" data-frame="5"><img src="frames_S/frame_S_06.png" alt=""></div>
+  <div class="frame" data-frame="6"><img src="frames_S/frame_S_07.png" alt=""></div>
+  <div class="frame" data-frame="7"><img src="frames_S/frame_S_08.png" alt=""></div>
+  <div class="frame" data-frame="8"><img src="frames_S/frame_S_09.png" alt=""></div>
+  <div class="frame" data-frame="9"><img src="frames_S/frame_S_10.png" alt=""></div>
+  <div class="frame" data-frame="10"><img src="frames_S/frame_S_11.png" alt=""></div>
+  <div class="frame" data-frame="11"><img src="frames_S/frame_S_12.png" alt=""></div>
+  <div class="frame" data-frame="12"><img src="frames_S/frame_S_13.png" alt=""></div>
+  <div class="frame" data-frame="13"><img src="frames_S/frame_S_14.png" alt=""></div>
+  <div class="frame" data-frame="14"><img src="frames_S/frame_S_15.png" alt=""></div>
+  <div class="frame" data-frame="15"><img src="frames_S/frame_S_16.png" alt=""></div>
+  <div class="frame" data-frame="16"><img src="frames_S/frame_S_17.png" alt=""></div>
+  <div class="frame" data-frame="17"><img src="frames_S/frame_S_18.png" alt=""></div>
+  <div class="frame" data-frame="18"><img src="frames_S/frame_S_19.png" alt=""></div>
+  <div class="frame" data-frame="19"><img src="frames_S/frame_S_20.png" alt=""></div>
+  <div class="frame" data-frame="20"><img src="frames_S/frame_S_21.png" alt=""></div>
+  <div class="frame" data-frame="21"><img src="frames_S/frame_S_22.png" alt=""></div>
+  <div class="frame" data-frame="22"><img src="frames_S/frame_S_23.png" alt=""></div>
+  <div class="frame" data-frame="23"><img src="frames_S/frame_S_24.png" alt=""></div>
+  <div class="frame" data-frame="24"><img src="frames_S/frame_S_25.png" alt=""></div>
+  <div class="frame" data-frame="25"><img src="frames_S/frame_S_26.png" alt=""></div>
+  <div class="frame" data-frame="26"><img src="frames_S/frame_S_27.png" alt=""></div>
+  <div class="frame" data-frame="27"><img src="frames_S/frame_S_28.png" alt=""></div>
+  <div class="frame" data-frame="28"><img src="frames_S/frame_S_29.png" alt=""></div>
+
+  <!-- Spotlights -->
+  <div class="spots-layer" id="spotsLayer">
+    <div class="spot" style="left:110px; top:660px;" data-closeup="1" title="Beine und Füsse">
+      <div class="spot-inner"></div>
+    </div>
+    <div class="spot" style="left:292px; top:362px;" data-closeup="2" title="Hüfte">
+      <div class="spot-inner"></div>
+    </div>
+    <div class="spot" style="left:120px; top:228px;" data-closeup="3" title="Arme">
+      <div class="spot-inner"></div>
+    </div>
+  </div>
+
+  <!-- Closeup screens -->
+  <div class="closeup-layer" id="closeup1">
+    <img src="frames_S/closeup_S_1.png" alt="Beine und Füsse">
+  </div>
+  <div class="closeup-layer" id="closeup2">
+    <img src="frames_S/closeup_S_2.png" alt="Hüfte">
+  </div>
+  <div class="closeup-layer" id="closeup3">
+    <img src="frames_S/closeup_S_3.png" alt="Arme">
+  </div>
+
+  <!-- Text slides — closeup 1 (Beine): 3 slides -->
+  <div class="text-layer" id="text1-1" data-closeup="1" data-index="0">
+    <img src="frames_S/text_S_1_1.png" alt="">
+    <div class="mehr-btn" data-closeup="1"></div>
+  </div>
+  <div class="text-layer" id="text1-2" data-closeup="1" data-index="1">
+    <img src="frames_S/text_S_1_2.png" alt="">
+    <div class="mehr-btn" data-closeup="1"></div>
+  </div>
+  <div class="text-layer" id="text1-3" data-closeup="1" data-index="2">
+    <img src="frames_S/text_S_1_3.png" alt="">
+    <div class="mehr-btn" data-closeup="1"></div>
+  </div>
+
+  <!-- Text slides — closeup 2 (Hüfte): 1 slide -->
+  <div class="text-layer" id="text2-1" data-closeup="2" data-index="0">
+    <img src="frames_S/text_S_2_1.png" alt="">
+    <div class="mehr-btn" data-closeup="2"></div>
+  </div>
+
+  <!-- Text slides — closeup 3 (Arme): 3 slides -->
+  <div class="text-layer" id="text3-1" data-closeup="3" data-index="0">
+    <img src="frames_S/text_S_3_1.png" alt="">
+    <div class="mehr-btn" data-closeup="3"></div>
+  </div>
+  <div class="text-layer" id="text3-2" data-closeup="3" data-index="1">
+    <img src="frames_S/text_S_3_2.png" alt="">
+    <div class="mehr-btn" data-closeup="3"></div>
+  </div>
+  <div class="text-layer" id="text3-3" data-closeup="3" data-index="2">
+    <img src="frames_S/text_S_3_3.png" alt="">
+    <div class="mehr-btn" data-closeup="3"></div>
+  </div>
+
+  <!-- Shared SVG icons used in all three detail heads -->
+  <!-- Back arrow (Figma node 301:20115 / 4f9080d...) -->
+  <svg style="display:none">
+    <symbol id="icon-back" viewBox="0 0 20 14">
+      <line x1="1" y1="7" x2="19" y2="7" stroke="#2A6192" stroke-width="2" stroke-linecap="round"/>
+      <path d="M8 1L1 7l7 6" stroke="#2A6192" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </symbol>
+    <!-- Target / home icon (Figma node Home) -->
+    <symbol id="icon-target" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8.8" stroke="#2A6192" stroke-width="2" fill="none"/>
+      <line x1="12.2" y1="17.6" x2="12.2" y2="24"  stroke="#2A6192" stroke-width="2"/>
+      <line x1="12.2" y1="0"    x2="12.2" y2="6.4"  stroke="#2A6192" stroke-width="2"/>
+      <line x1="0"    y1="11.8" x2="6.4"  y2="11.8" stroke="#2A6192" stroke-width="2"/>
+      <line x1="17.6" y1="11.8" x2="24"   y2="11.8" stroke="#2A6192" stroke-width="2"/>
+      <circle cx="12" cy="12" r="4" fill="#2A6192"/>
+    </symbol>
+  </svg>
+
+  <!-- Detail screens (scrollable onepagers, one per closeup) -->
+  <div class="detail-layer" id="detail1">
+    <div class="detail-head">
+      <div class="detail-head-inner">
+        <svg class="detail-head-menu"><use href="#icon-back"/></svg>
+        <span class="detail-head-title">Beine und Füsse</span>
+        <svg class="detail-head-home"><use href="#icon-target"/></svg>
+      </div>
+    </div>
+    <div class="detail-scroll">
+      <div class="detail-img-wrap">
+        <img src="frames_S/detail_S_1_statisch.png" alt="Beine und Füsse – Detail">
+        <div class="zurück-tap"></div>
+      </div>
+    </div>
+  </div>
+  <div class="detail-layer" id="detail2">
+    <div class="detail-head">
+      <div class="detail-head-inner">
+        <svg class="detail-head-menu"><use href="#icon-back"/></svg>
+        <span class="detail-head-title">Hüfte</span>
+        <svg class="detail-head-home"><use href="#icon-target"/></svg>
+      </div>
+    </div>
+    <div class="detail-scroll">
+      <div class="detail-img-wrap">
+        <img src="frames_S/detail_S_2.png" alt="Hüfte – Detail">
+        <div class="zurück-tap"></div>
+      </div>
+    </div>
+  </div>
+  <div class="detail-layer" id="detail3">
+    <div class="detail-head">
+      <div class="detail-head-inner">
+        <svg class="detail-head-menu"><use href="#icon-back"/></svg>
+        <span class="detail-head-title">Arme</span>
+        <svg class="detail-head-home"><use href="#icon-target"/></svg>
+      </div>
+    </div>
+    <div class="detail-scroll">
+      <div class="detail-img-wrap">
+        <img src="frames_S/detail_S_3.png" alt="Arme – Detail">
+        <div class="zurück-tap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slider -->
+  <div class="slider-bar" id="sliderBar">
+    <div class="arrow-btn" id="btnLeft"></div>
+    <div class="slider-track-wrap" id="trackWrap">
+      <div class="slider-thumb" id="sliderThumb"></div>
+    </div>
+    <div class="arrow-btn" id="btnRight"></div>
+  </div>
+
+  <!-- Header tap zones -->
+  <div class="header-btn" id="btnMenu"></div>
+  <div class="header-btn" id="btnTarget"></div>
+
+</div>
+
+<script>
+  const TOTAL      = 29;
+  const SPOT_DELAY = 400;
+  const PHONE_W    = 402;
+  const PHONE_H    = 874;
+  const PULL_ZONE           = 80;
+  const PULL_THRESHOLD      = 90;
+  const SWIPE_UP_THRESHOLD  = 30;
+
+  const TEXT_COUNTS = { '1': 3, '2': 1, '3': 3 };
+
+  const allFrames   = document.querySelectorAll('.frame');
+  const thumb       = document.getElementById('sliderThumb');
+  const sliderBar   = document.getElementById('sliderBar');
+  const trackWrap   = document.getElementById('trackWrap');
+  const spotsLayer  = document.getElementById('spotsLayer');
+  const allCloseups = document.querySelectorAll('.closeup-layer');
+  const allTexts    = document.querySelectorAll('.text-layer');
+
+  let current         = 0;
+  let dragging        = false;
+  let dragStartX      = 0;
+  let dragStartFrame  = 0;
+  let spotTimer       = null;
+  let peekTimer       = null;
+  let activeCloseupId = null;
+  let activeTextIdx   = -1;
+  let activeDetailId  = null;
+
+  function getTextEl(closeupId, idx) {
+    return document.getElementById('text' + closeupId + '-' + (idx + 1));
+  }
+
+  // ── Frame switching ──────────────────────────────────────
+  function showFrame(idx) {
+    idx = Math.max(0, Math.min(TOTAL - 1, Math.round(idx)));
+    if (idx === current) return;
+    allFrames[current].classList.remove('active');
+    allFrames[idx].classList.add('active');
+    current = idx;
+    thumb.style.left = (idx / (TOTAL - 1) * 100) + '%';
+  }
+
+  // ── Spotlights ───────────────────────────────────────────
+  function hideSpots() { clearTimeout(spotTimer); spotsLayer.classList.remove('visible'); }
+  function scheduleSpots() {
+    clearTimeout(spotTimer);
+    if (current === 0) spotTimer = setTimeout(() => spotsLayer.classList.add('visible'), SPOT_DELAY);
+  }
+
+  // ── Text slides ──────────────────────────────────────────
+  function startPeek(closeupId) {
+    clearTimeout(peekTimer);
+    if (!TEXT_COUNTS[closeupId]) return;
+    peekTimer = setTimeout(() => {
+      if (activeCloseupId === closeupId && activeTextIdx === -1)
+        getTextEl(closeupId, 0).classList.add('peeking');
+    }, 600);
+  }
+  function stopPeek(closeupId) {
+    clearTimeout(peekTimer);
+    if (TEXT_COUNTS[closeupId]) getTextEl(closeupId, 0).classList.remove('peeking');
+  }
+  function showTextSlide(closeupId, idx) {
+    stopPeek(closeupId);
+    const el = getTextEl(closeupId, idx);
+    el.classList.remove('done', 'peeking');
+    el.classList.add('visible');
+    activeTextIdx = idx;
+  }
+  function resetTextSlides(closeupId) {
+    clearTimeout(peekTimer);
+    const count = TEXT_COUNTS[closeupId] || 0;
+    for (let i = 0; i < count; i++) {
+      const el = getTextEl(closeupId, i);
+      el.classList.remove('visible', 'done', 'peeking', 'swiping');
+      el.style.transform = '';
+    }
+    activeTextIdx = -1;
+  }
+
+  // ── Detail open / close ──────────────────────────────────
+  function openDetail(closeupId) {
+    activeDetailId = closeupId;
+    document.getElementById('detail' + closeupId).classList.add('visible');
+  }
+  function dismissDetail() {
+    if (!activeDetailId) return;
+    const layer = document.getElementById('detail' + activeDetailId);
+    layer.classList.remove('visible');
+    setTimeout(() => { layer.querySelector('.detail-scroll').scrollTop = 0; }, 350);
+    activeDetailId = null;
+  }
+
+  // ── Closeup open / close ─────────────────────────────────
+  function openCloseup(id) {
+    hideSpots();
+    activeCloseupId = id;
+    activeTextIdx   = -1;
+    document.getElementById('closeup' + id).classList.add('visible');
+    startPeek(id);
+  }
+  function dismissAllCloseups() {
+    allTexts.forEach(t => { t.classList.remove('visible','done','peeking','swiping'); t.style.transform = ''; });
+    clearTimeout(peekTimer);
+    activeTextIdx = -1; activeCloseupId = null;
+    allCloseups.forEach(l => { l.classList.remove('visible','swiping'); l.style.transform = ''; });
+    scheduleSpots();
+  }
+
+  // ── Slider ───────────────────────────────────────────────
+  sliderBar.addEventListener('pointerdown', e => {
+    dragging = true; dragStartX = e.clientX; dragStartFrame = current;
+    sliderBar.setPointerCapture(e.pointerId); hideSpots(); e.preventDefault();
+  });
+  sliderBar.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const tw = trackWrap.getBoundingClientRect().width;
+    showFrame(dragStartFrame + ((e.clientX - dragStartX) / tw) * (TOTAL - 1));
+  });
+  sliderBar.addEventListener('pointerup',     () => { dragging = false; scheduleSpots(); });
+  sliderBar.addEventListener('pointercancel', () => { dragging = false; scheduleSpots(); });
+  sliderBar.addEventListener('click', e => {
+    if (Math.abs(e.clientX - dragStartX) > 4) return;
+    const rect = trackWrap.getBoundingClientRect();
+    showFrame(Math.round(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * (TOTAL - 1)));
+    scheduleSpots();
+  });
+  document.getElementById('btnLeft').addEventListener('click',  e => { e.stopPropagation(); hideSpots(); showFrame(current - 1); scheduleSpots(); });
+  document.getElementById('btnRight').addEventListener('click', e => { e.stopPropagation(); hideSpots(); showFrame(current + 1); scheduleSpots(); });
+
+  // ── Spot taps ────────────────────────────────────────────
+  document.querySelectorAll('.spot').forEach(spot => {
+    spot.addEventListener('click', () => openCloseup(spot.dataset.closeup));
+  });
+
+  // ── "Mehr" button ────────────────────────────────────────
+  document.querySelectorAll('.mehr-btn').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); openDetail(btn.dataset.closeup); });
+  });
+
+  // ── Header buttons ───────────────────────────────────────
+  document.getElementById('btnTarget').addEventListener('click', () => { dismissDetail(); dismissAllCloseups(); });
+  document.getElementById('btnMenu').addEventListener('click', () => {
+    if (activeDetailId)                             dismissDetail();
+    else if (activeTextIdx >= 0 && activeCloseupId) { resetTextSlides(activeCloseupId); startPeek(activeCloseupId); }
+    else if (activeCloseupId)                       dismissAllCloseups();
+  });
+
+  // ── Closeup gestures ─────────────────────────────────────
+  allCloseups.forEach(layer => {
+    let startY = 0, gesture = null;
+    layer.addEventListener('pointerdown', e => { startY = e.clientY; gesture = null; layer.setPointerCapture(e.pointerId); });
+    layer.addEventListener('pointermove', e => {
+      const dy = e.clientY - startY;
+      if (gesture === null && Math.abs(dy) > 8) {
+        const startRelY = startY - layer.getBoundingClientRect().top;
+        if (e.pointerType === 'touch' && startRelY <= PULL_ZONE && dy > 0) { gesture = 'pulldown'; layer.classList.add('swiping'); }
+        else if (dy < 0) gesture = 'swipeup';
+        else gesture = 'none';
+      }
+      if (gesture === 'pulldown' && dy > 0) layer.style.transform = 'translateY(' + dy + 'px)';
+    });
+    layer.addEventListener('pointerup', e => {
+      const dy = e.clientY - startY;
+      if (gesture === 'pulldown') {
+        layer.classList.remove('swiping');
+        if (dy > PULL_THRESHOLD) {
+          const cid = layer.id.replace('closeup', '');
+          layer.style.transform = 'translateY(' + PHONE_H + 'px)';
+          setTimeout(() => { layer.classList.remove('visible'); layer.style.transform = ''; resetTextSlides(cid); activeCloseupId = null; scheduleSpots(); }, 320);
+        } else { layer.style.transform = ''; }
+      } else if (gesture === 'swipeup' && dy < -SWIPE_UP_THRESHOLD) {
+        const cid = layer.id.replace('closeup', '');
+        if (TEXT_COUNTS[cid] && activeTextIdx === -1) showTextSlide(cid, 0);
+      }
+      gesture = null;
+    });
+    layer.addEventListener('pointercancel', () => { if (gesture === 'pulldown') { layer.classList.remove('swiping'); layer.style.transform = ''; } gesture = null; });
+  });
+
+  // ── Text slides: tap to advance (circular) ───────────────
+  allTexts.forEach(layer => {
+    layer.addEventListener('click', e => {
+      const cid = layer.dataset.closeup, idx = parseInt(layer.dataset.index), count = TEXT_COUNTS[cid] || 1;
+      if (layer.classList.contains('peeking')) { showTextSlide(cid, 0); return; }
+      if (e.clientY - layer.getBoundingClientRect().top < PULL_ZONE) return;
+      layer.classList.remove('visible');
+      showTextSlide(cid, (idx + 1) % count);
+    });
+  });
+
+  // ── "Zurück" tap zone at bottom of detail onepagers ────────
+  // Taps the baked-in "Zurück" button → goes all the way back to rotation
+  document.querySelectorAll('.zurück-tap').forEach(tap => {
+    tap.addEventListener('click', e => {
+      e.stopPropagation();
+      dismissDetail();
+      dismissAllCloseups();
+    });
+  });
+
+  scheduleSpots();
+
+  // ── Fit phone to viewport ────────────────────────────────
+  function fitPhone() {
+    const s = Math.min(window.innerWidth / PHONE_W, window.innerHeight / PHONE_H, 1);
+    document.getElementById('phone').style.transform = `translate(-50%,-50%) scale(${s})`;
+  }
+  fitPhone();
+  window.addEventListener('resize', fitPhone);
+</script>
+</body>
+</html>
