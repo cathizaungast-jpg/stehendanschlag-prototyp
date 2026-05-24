@@ -14,6 +14,7 @@
       width: 100vw;
       height: 100vh;
       height: 100svh;
+      padding-top: env(safe-area-inset-top, 0px);
     }
 
     /* ── Phone shell ── */
@@ -778,11 +779,23 @@
   /* ── Initial spot scheduling ─────────────────────────────────── */
   scheduleSpots();
 
-  /* ── Fit phone to viewport on desktop ───────────────────────── */
+  /* ── Fit phone to viewport ───────────────────────────────────── */
   function fitPhone() {
-    // Scale based on width so the phone always fills the full screen width
-    const s = window.innerWidth / PHONE_W;
-    phone.style.transform = `translate(-50%,-50%) scale(${s})`;
+    if (window.innerWidth <= 500) {
+      // Mobile: pin to top-left, scale by width only
+      const s = window.innerWidth / PHONE_W;
+      phone.style.top = '0';
+      phone.style.left = '0';
+      phone.style.transformOrigin = 'top left';
+      phone.style.transform = `scale(${s})`;
+    } else {
+      // Desktop: fit inside viewport without exceeding 1× scale
+      const s = Math.min(window.innerWidth / PHONE_W, window.innerHeight / PHONE_H, 1);
+      phone.style.top = '50%';
+      phone.style.left = '50%';
+      phone.style.transformOrigin = 'center center';
+      phone.style.transform = `translate(-50%,-50%) scale(${s})`;
+    }
   }
   fitPhone();
   window.addEventListener('resize', fitPhone);
