@@ -38,19 +38,19 @@
     }
     .frame.active { display: block; }
     .frame img {
-      /* New Figma SVGs: viewBox 390×819, positioned at y=25 within the 844px phone frame */
+      /* Figma nav-f1_S: figure top-[calc(50%+31.5px)] h-[819px] → y=44 in 844px frame */
       position: absolute;
       width: 390px;
       height: 819px;
       left: 0;
-      top: 25px;
+      top: 44px;
       display: block;
     }
 
-    /* ── Head bar (rotation view) — Figma Head_S: top:64px, flex gap:29px ── */
+    /* ── Head bar (rotation view) — Figma Head_S: top:96px, flex gap:29px ── */
     .head-bar {
       position: absolute;
-      top: 64px;
+      top: 96px;
       left: 50%;
       transform: translateX(-50%);
       display: flex;
@@ -258,10 +258,10 @@
       z-index: 2;
     }
 
-    /* ── Slider — Figma inset: 90.28% 12.94% 4.45% 11.44% of 390×844 ── */
+    /* ── Slider — Figma inset: 86.49% 12.94% 8.24% 11.44% of 390×844 ── */
     .slider-bar {
       position: absolute;
-      top:    762px;   /* 90.28% × 844 */
+      top:    730px;   /* 86.49% × 844 */
       left:    45px;   /* 11.44% × 390 */
       right:   51px;   /* 12.94% × 390 */
       height:  44px;   /* remaining */
@@ -316,7 +316,7 @@
     /* ── Header tap zones (always at z-index 50, on top of everything) ── */
     .header-btn {
       position: absolute;
-      top: 54px;    /* center at y≈76 matching Head_S top:64 + half-height */
+      top: 79px;    /* center at y≈101 matching Head_S top:96 + half-height */
       width: 44px;
       height: 44px;
       z-index: 50;
@@ -380,20 +380,36 @@
     </svg>
   </div>
 
-  <!-- Spotlights — exact positions from Figma nav-f1_S (node 368:40431)
-       Each spot is a 20×20 element; center coords: left+10, top+10
-       Spot 1: left:72 top:700  → center (82, 710)  → Beine und Füsse
-       Spot 2: left:295 top:408 → center (305, 418) → Hüfte
-       Spot 3: left:94 top:239  → center (104, 249) → Arme
+  <!-- Spotlights — nav-f1_S (frame 0): Figma left+10, top+10 → center coords
+       Spot 1: left:80 top:684 → center (90, 694)  → Beine und Füsse
+       Spot 2: left:289 top:411 → center (299, 421) → Hüfte
+       Spot 3: left:106 top:242 → center (116, 252) → Arme
   -->
   <div class="spots-layer" id="spotsLayer">
-    <div class="spot" style="left:82px; top:710px;" data-closeup="1" title="Beine und Füsse">
+    <div class="spot" style="left:90px; top:694px;" data-closeup="1" title="Beine und Füsse">
       <img src="frames_v3/spot.svg" class="spot-visual" alt="">
     </div>
-    <div class="spot" style="left:305px; top:418px;" data-closeup="2" title="Hüfte">
+    <div class="spot" style="left:299px; top:421px;" data-closeup="2" title="Hüfte">
       <img src="frames_v3/spot.svg" class="spot-visual" alt="">
     </div>
-    <div class="spot" style="left:104px; top:249px;" data-closeup="3" title="Arme">
+    <div class="spot" style="left:116px; top:252px;" data-closeup="3" title="Arme">
+      <img src="frames_v3/spot.svg" class="spot-visual" alt="">
+    </div>
+  </div>
+
+  <!-- Spotlights — nav-f10_S (frame 9): only foot (Beine und Füsse) is clickable
+       Spot 1: left:246 top:683 → center (256, 693) → Beine und Füsse (CLICKABLE)
+       Spot 2: left:257 top:387 → center (267, 397) → visual only
+       Spot 3: left:139 top:283 → center (149, 293) → visual only
+  -->
+  <div class="spots-layer" id="spotsLayer10">
+    <div class="spot" style="left:256px; top:693px;" data-closeup="10-1" title="Beine und Füsse">
+      <img src="frames_v3/spot.svg" class="spot-visual" alt="">
+    </div>
+    <div class="spot" style="left:267px; top:397px;" title="(noch nicht verknüpft)">
+      <img src="frames_v3/spot.svg" class="spot-visual" alt="">
+    </div>
+    <div class="spot" style="left:149px; top:293px;" title="(noch nicht verknüpft)">
       <img src="frames_v3/spot.svg" class="spot-visual" alt="">
     </div>
   </div>
@@ -441,6 +457,26 @@
   <div class="text-layer" id="text3-3" data-closeup="3" data-index="2">
     <img src="frames_v3/text_3_3.png" alt="">
     <div class="mehr-btn" data-closeup="3"></div>
+  </div>
+
+  <!-- ── Frame 10 → Beine und Füsse ───────────────────────────── -->
+  <!-- Closeup: Beine und Füsse (frame 10, section 1) -->
+  <div class="closeup-layer" id="closeup10-1">
+    <img src="frames_v3/closeup_10_1.png" alt="Beine und Füsse">
+  </div>
+
+  <!-- Text slides — frame 10, section 1 (Beine und Füsse): 3 slides -->
+  <div class="text-layer" id="text10-1-1" data-closeup="10-1" data-index="0">
+    <img src="frames_v3/text_10_1_1.png" alt="">
+    <div class="mehr-btn" data-closeup="10-1"></div>
+  </div>
+  <div class="text-layer" id="text10-1-2" data-closeup="10-1" data-index="1">
+    <img src="frames_v3/text_10_1_2.png" alt="">
+    <div class="mehr-btn" data-closeup="10-1"></div>
+  </div>
+  <div class="text-layer" id="text10-1-3" data-closeup="10-1" data-index="2">
+    <img src="frames_v3/text_10_1_3.png" alt="">
+    <div class="mehr-btn" data-closeup="10-1"></div>
   </div>
 
   <!-- Shared SVG icons for all detail heads -->
@@ -546,17 +582,21 @@
   const PULL_THRESHOLD      = 90;   /* px drag needed to dismiss closeup */
   const SWIPE_UP_THRESHOLD  = 30;   /* px upward swipe to reveal first text slide */
 
-  /* Text slide counts per section */
-  const TEXT_COUNTS = { '1': 3, '2': 1, '3': 3 };
+  /* Text slide counts per closeup id */
+  const TEXT_COUNTS = { '1': 3, '2': 1, '3': 3, '10-1': 3 };
 
-  const phone       = document.getElementById('phone');
-  const allFrames   = document.querySelectorAll('.frame');
-  const thumb       = document.getElementById('sliderThumb');
-  const sliderBar   = document.getElementById('sliderBar');
-  const trackWrap   = document.getElementById('trackWrap');
-  const spotsLayer  = document.getElementById('spotsLayer');
-  const allCloseups = document.querySelectorAll('.closeup-layer');
-  const allTexts    = document.querySelectorAll('.text-layer');
+  /* Frames that show a nav overlay: frameIndex → spotsLayerId */
+  const NAV_FRAMES = { 0: 'spotsLayer', 9: 'spotsLayer10' };
+
+  const phone        = document.getElementById('phone');
+  const allFrames    = document.querySelectorAll('.frame');
+  const thumb        = document.getElementById('sliderThumb');
+  const sliderBar    = document.getElementById('sliderBar');
+  const trackWrap    = document.getElementById('trackWrap');
+  const spotsLayer   = document.getElementById('spotsLayer');
+  const spotsLayer10 = document.getElementById('spotsLayer10');
+  const allCloseups  = document.querySelectorAll('.closeup-layer');
+  const allTexts     = document.querySelectorAll('.text-layer');
 
   let current         = 0;
   let dragging        = false;
@@ -583,10 +623,15 @@
   }
 
   /* ── Spotlights ──────────────────────────────────────────── */
-  function hideSpots()  { clearTimeout(spotTimer); spotsLayer.classList.remove('visible'); }
+  function hideSpots() {
+    clearTimeout(spotTimer);
+    spotsLayer.classList.remove('visible');
+    spotsLayer10.classList.remove('visible');
+  }
   function scheduleSpots() {
     clearTimeout(spotTimer);
-    if (current === 0) spotTimer = setTimeout(() => spotsLayer.classList.add('visible'), SPOT_DELAY);
+    const layerId = NAV_FRAMES[current];
+    if (layerId) spotTimer = setTimeout(() => document.getElementById(layerId).classList.add('visible'), SPOT_DELAY);
   }
 
   /* ── Text slides ──────────────────────────────────────────── */
@@ -622,12 +667,15 @@
 
   /* ── Detail open / close ───────────────────────────────────── */
   function openDetail(closeupId) {
+    const el = document.getElementById('detail' + closeupId);
+    if (!el) return;   /* detail page not yet implemented */
     activeDetailId = closeupId;
-    document.getElementById('detail' + closeupId).classList.add('visible');
+    el.classList.add('visible');
   }
   function dismissDetail() {
     if (!activeDetailId) return;
     const layer = document.getElementById('detail' + activeDetailId);
+    if (!layer) { activeDetailId = null; return; }
     layer.classList.remove('visible');
     setTimeout(() => { layer.querySelector('.detail-scroll').scrollTop = 0; }, 350);
     activeDetailId = null;
@@ -689,8 +737,8 @@
     e.stopPropagation(); hideSpots(); showFrame(current + 1); scheduleSpots();
   });
 
-  /* ── Spot taps ─────────────────────────────────────────────── */
-  document.querySelectorAll('.spot').forEach(spot => {
+  /* ── Spot taps (only spots with data-closeup are interactive) ── */
+  document.querySelectorAll('.spot[data-closeup]').forEach(spot => {
     spot.addEventListener('click', () => openCloseup(spot.dataset.closeup));
   });
 
